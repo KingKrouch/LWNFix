@@ -1,0 +1,3 @@
+SceneManager.CameraObj, which leads to a PlayerCamera GameObject with a child GameObject named Camera containing a Camera component. This is what we want to modify.
+
+Need to figure out how to adjust the other cameras in-game, probably would be faster to just universally hook any camera upon it's construction to adjust the properties.
