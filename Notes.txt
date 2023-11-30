@@ -1,3 +1,9 @@
-SceneManager.CameraObj, which leads to a PlayerCamera GameObject with a child GameObject named Camera containing a Camera component. This is what we want to modify.
+WizardGirl_Nonota(Clone)/AimLookHereRotation/LookHereRotation -> Local Position
 
-Need to figure out how to adjust the other cameras in-game, probably would be faster to just universally hook any camera upon it's construction to adjust the properties.
+Adjust the local position from (0, 0.209, 0) to Vector3(-0.5, 0.5, 0)
+
+I can also approach this by modifying the AimLookHereRotation's Local Position, but that also modifies the local position of the LookHereRotation as well. I'm unsure how it will look with aiming, but ideally, I want to adjust these things separately.
+
+By default, the AimLookHereRotation is (0.0, 1.1, 0.0). I would need to figure out how to hook the LERPing between aiming and not aiming, so I can adjust this depending on if the character is in an aiming state or not. Also, adjusting it through the AimLookHereRotation causes some really weird bugs with camera drift with player movement.
+
+I still need to figure out how to modify the cutscene cameras and such to use Vert+ FOV scaling. Gameplay camera is already accounted for.

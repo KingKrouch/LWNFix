@@ -1,7 +1,9 @@
-﻿using BepInEx;
+﻿using System;
+using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
+using Steamworks;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Rendering.Universal;
@@ -24,7 +26,18 @@ public class Plugin : BasePlugin
         Harmony.CreateAndPatchAll(typeof(ResolutionPatches));
         Harmony.CreateAndPatchAll(typeof(UIPatches));
         Harmony.CreateAndPatchAll(typeof(GraphicsPatches));
-        Harmony.CreateAndPatchAll(typeof(FOVPatches));
+        Harmony.CreateAndPatchAll(typeof(SteamPatches));
+        Harmony.CreateAndPatchAll(typeof(CameraPatches));
+    }
+
+    [HarmonyPatch]
+    public class SteamPatches
+    {
+        [HarmonyPatch(typeof(SteamManager), nameof(SteamManager.InitOnPlayMode)), HarmonyPostfix]
+        public static void SteamHook(SteamManager __instance)
+        {
+            
+        }
     }
     
     [HarmonyPatch]
@@ -67,16 +80,25 @@ public class Plugin : BasePlugin
     }
 
     [HarmonyPatch]
-    public class FOVPatches
+    public class CameraPatches
     {
-        //[HarmonyPatch(typeof(Camera), MethodType.StaticConstructor), HarmonyPostfix]
-        public static void UpdateCameraFOV(Camera __instance)
+        [HarmonyPatch(typeof(PlayerCamera), nameof(PlayerCamera.Init), new Type[] { typeof(WizardGirlManage) }), HarmonyPostfix]
+        public static void PlayerCameraTweaks(PlayerCamera __instance)
         {
-            var oldFOV = __instance.fieldOfView;
-            __instance.sensorSize = new Vector2(16,9);
-            __instance.gateFit = Camera.GateFitMode.Overscan;
-            __instance.usePhysicalProperties = true;
-            __instance.fieldOfView = oldFOV;
+            // Find the GameObject named "LookHereRotation"
+            var lookHereRot = GameObject.Find("LookHereRotation");
+            //var lookHereRot = __instance.g_PlayerLookHereRot.Find("LookHereRotation");
+            if (lookHereRot != null) {
+                lookHereRot.gameObject.transform.localPosition = new Vector3(-0.5f, 0.5f, 0.0f);
+            }
+            
+            // Use Overscan FOV scaling. First we need to get the camera FOV before making adjustments.
+            // NOTE: This probably does not take cutscenes or other cameras into account. Will need to find a hook for those.
+            var oldFOV = __instance.g_CameraSet.fieldOfView;
+            __instance.g_CameraSet.sensorSize = new Vector2(16,9);
+            __instance.g_CameraSet.gateFit = Camera.GateFitMode.Overscan;
+            __instance.g_CameraSet.usePhysicalProperties = true;
+            __instance.g_CameraSet.fieldOfView = oldFOV;
         }
     }
 
