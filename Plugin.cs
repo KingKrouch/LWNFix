@@ -7,6 +7,7 @@ using Steamworks;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.Video;
 
 
 namespace LWNFix;
@@ -56,8 +57,18 @@ public class Plugin : BasePlugin
     public class GraphicsPatches
     {
         [HarmonyPatch(typeof(Game), nameof(Game.UpdateQualitySettings)), HarmonyPostfix]
-        public static void LoadGraphicsSettings()
+        public static void LoadGraphicsSettings(Game __instance)
         {
+            // TODO: Figure out why this FixedDeltaTime adjustment won't work.
+            // Quick Fixed Delta Time Fix (for hair physics). May just find the hair component and move it's FixedUpdate to standard Update instead.
+            Time.fixedDeltaTime = __instance.config.screenSettings.fps switch {
+                FPSLimitation.FPS30     => 1.0f / 30,
+                FPSLimitation.FPS60     => 1.0f / 60,
+                FPSLimitation.FPS120    => 1.0f / 120,
+                FPSLimitation.Unlimited => 1.0f / Screen.currentResolution.m_RefreshRate,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            
             // TODO:
             // 1. Figure out why the texture filtering is not working correctly. Despite our patches, the textures are still blurry as fuck and has visible seams.
             // 2. Find a way of writing to the shadow resolution variables in the UniversalRenderPipelineAsset.
@@ -124,6 +135,45 @@ public class Plugin : BasePlugin
             else
             {
                 magicBarAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
+            }
+        }
+
+        [HarmonyPatch(typeof(StaffManager), nameof(StaffManager.PlayVideo)), HarmonyPostfix]
+        public static void FixCreditsVideoScaling(StaffManager __instance)
+        {
+            __instance.player.aspectRatio = VideoAspectRatio.FitInside;
+        }
+
+        [HarmonyPatch(typeof(UIVideoPlayer), nameof(UIVideoPlayer.PlayFromBeginning))]
+        public static void FixVideoPlayback(UIVideoPlayer __instance)
+        {
+            // TODO: Figure out why this code isn't working.
+            var videoPlayerComponent = __instance.gameObject.GetComponent<VideoPlayer>();
+            if (videoPlayerComponent != null) {
+                // By default, the game uses FitHorizontal, which while works for ultrawide, might cause problems with resolutions narrower than 16:9.
+                videoPlayerComponent.aspectRatio = VideoAspectRatio.FitInside;
+            }
+        }
+
+        [HarmonyPatch(typeof(UIOpeningMenu), nameof(UIOpeningMenu.Init))]
+        public static void FixMainMenuVignette(UIOpeningMenu __instance)
+        {
+            // We need to explicitly check if it exists first, as for some reason, the component can be added twice and cause slow movement.
+            var vignetteAspectRatioFitter = __instance.gameObject.GetComponent<AspectRatioFitter>();
+            if (vignetteAspectRatioFitter != null) return;
+            vignetteAspectRatioFitter = __instance.gameObject.AddComponent<AspectRatioFitter>();
+            Debug.Log("Adding Aspect Ratio Fitter to " + __instance.gameObject.name);
+            vignetteAspectRatioFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            vignetteAspectRatioFitter.enabled = true;
+
+            // Check if the display aspect ratio is less than 16:9, and if so, disable the AspectRatioFitter and use the old transforms.
+            if (Screen.currentResolution.m_Width / Screen.currentResolution.m_Height >= 1920.0f / 1080.0f)
+            {
+                vignetteAspectRatioFitter.aspectRatio = 1920.0f / 1080.0f;
+            }
+            else
+            {
+                vignetteAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
             }
         }
     }

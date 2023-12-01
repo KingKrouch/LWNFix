@@ -7,3 +7,8 @@ I can also approach this by modifying the AimLookHereRotation's Local Position, 
 By default, the AimLookHereRotation is (0.0, 1.1, 0.0). I would need to figure out how to hook the LERPing between aiming and not aiming, so I can adjust this depending on if the character is in an aiming state or not. Also, adjusting it through the AimLookHereRotation causes some really weird bugs with camera drift with player movement.
 
 I still need to figure out how to modify the cutscene cameras and such to use Vert+ FOV scaling. Gameplay camera is already accounted for.
+
+I can probably find a way to adjust the FixedUpdate time to the current screen refresh rate, so physics bodies (like hair) have less visible juddering.
+
+UIOpeningMenu > Background > needs an AspectRatio fitter with a 16:9 scale when the aspect ratio is 16:9 or over.
+The scale of LBack02 and RBack02 need the local position shifted about 20 pixels at least on a 3440x1440 display. For example, LBack02 would have an X value of -1300 (instead of 1280), and RBack02 would have an X value of 1300 (instead of 1280).
