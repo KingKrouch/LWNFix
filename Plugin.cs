@@ -19,8 +19,8 @@ public class Plugin : BasePlugin
 {
     private static ManualLogSource? LogSource { get; set; }
 
-    public static ConfigEntry<int>  _iHorizontalResolution;
-    public static ConfigEntry<int>  _iVerticalResolution;
+    public static ConfigEntry<int> _iHorizontalResolution;
+    public static ConfigEntry<int> _iVerticalResolution;
     public static ConfigEntry<bool> _bCenteredCamera;
 
     private void InitConfig()
@@ -33,11 +33,11 @@ public class Plugin : BasePlugin
     public override void Load()
     {
         LogSource = Log;
-        
+
         Log.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
         InitConfig();
-        
+
         Harmony.CreateAndPatchAll(typeof(ResolutionPatches));
         Harmony.CreateAndPatchAll(typeof(UIPatches));
         Harmony.CreateAndPatchAll(typeof(GraphicsPatches));
@@ -51,10 +51,10 @@ public class Plugin : BasePlugin
         [HarmonyPatch(typeof(SteamManager), nameof(SteamManager.InitOnPlayMode)), HarmonyPostfix]
         public static void SteamHook(SteamManager __instance)
         {
-            
+
         }
     }
-    
+
     [HarmonyPatch]
     public class ResolutionPatches
     {
@@ -76,23 +76,23 @@ public class Plugin : BasePlugin
             // TODO: Figure out why this FixedDeltaTime adjustment won't work.
             // Quick Fixed Delta Time Fix (for hair physics). May just find the hair component and move it's FixedUpdate to standard Update instead.
             Time.fixedDeltaTime = __instance.config.screenSettings.fps switch {
-                FPSLimitation.FPS30     => 1.0f / 30,
-                FPSLimitation.FPS60     => 1.0f / 60,
-                FPSLimitation.FPS120    => 1.0f / 120,
+                FPSLimitation.FPS30 => 1.0f / 30,
+                FPSLimitation.FPS60 => 1.0f / 60,
+                FPSLimitation.FPS120 => 1.0f / 120,
                 FPSLimitation.Unlimited => 1.0f / Screen.currentResolution.m_RefreshRate,
                 _ => throw new ArgumentOutOfRangeException()
             };
-            
+
             // TODO:
             // 1. Figure out why the texture filtering is not working correctly. Despite our patches, the textures are still blurry as fuck and has visible seams.
             // 2. Find a way of writing to the shadow resolution variables in the UniversalRenderPipelineAsset.
-            
+
             QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
             Texture.SetGlobalAnisotropicFilteringLimits(16, 16);
             //Texture.masterTextureLimit      = 0; // Can raise this to force lower the texture size. Goes up to 14.
             //QualitySettings.maximumLODLevel = 0; // Can raise this to force lower the LOD settings. 3 at max if you want it to look like a blockout level prototype.
             //QualitySettings.lodBias         = 1.0f;
-            
+
             // Let's adjust some of the Render Pipeline Settings during runtime.
             //var asset = QualitySettings.renderPipeline as UniversalRenderPipelineAsset;
 
@@ -119,11 +119,11 @@ public class Plugin : BasePlugin
                     lookHereRot.gameObject.transform.localPosition = new Vector3(-0.5f, 0.5f, 0.0f);
                 }
             }
-            
+
             // Use Overscan FOV scaling. First we need to get the camera FOV before making adjustments.
             // NOTE: This probably does not take cutscenes or other cameras into account. Will need to find a hook for those.
             var oldFOV = __instance.g_CameraSet.fieldOfView;
-            __instance.g_CameraSet.sensorSize = new Vector2(16,9);
+            __instance.g_CameraSet.sensorSize = new Vector2(16, 9);
             __instance.g_CameraSet.gateFit = Camera.GateFitMode.Overscan;
             __instance.g_CameraSet.usePhysicalProperties = true;
             __instance.g_CameraSet.fieldOfView = oldFOV;
@@ -133,6 +133,19 @@ public class Plugin : BasePlugin
     [HarmonyPatch]
     public class UIPatches
     {
+        private static void AdjustAspectRatioFitter(AspectRatioFitter arf)
+        {
+            arf.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            arf.enabled = true;
+            // Check if the display aspect ratio is less than 16:9, and if so, disable the AspectRatioFitter and use the old transforms.
+            if (Screen.currentResolution.m_Width / Screen.currentResolution.m_Height >= 1920.0f / 1080.0f) {
+                arf.aspectRatio = 1920.0f / 1080.0f;
+            }
+            else {
+                arf.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
+            }
+        }
+
         [HarmonyPatch(typeof(UIMagicBar), nameof(UIMagicBar.Init)), HarmonyPostfix]
         public static void AddAspectRatioFitterToMagicBar(UIMagicBar __instance)
         {
@@ -141,18 +154,7 @@ public class Plugin : BasePlugin
             if (magicBarAspectRatioFitter != null) return;
             magicBarAspectRatioFitter = __instance.gameObject.AddComponent<AspectRatioFitter>();
             Debug.Log("Adding Aspect Ratio Fitter to " + __instance.gameObject.name);
-            magicBarAspectRatioFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            magicBarAspectRatioFitter.enabled = true;
-
-            // Check if the display aspect ratio is less than 16:9, and if so, disable the AspectRatioFitter and use the old transforms.
-            if (Screen.currentResolution.m_Width / Screen.currentResolution.m_Height >= 1920.0f / 1080.0f)
-            {
-                magicBarAspectRatioFitter.aspectRatio = 1920.0f / 1080.0f;
-            }
-            else
-            {
-                magicBarAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
-            }
+            AdjustAspectRatioFitter(magicBarAspectRatioFitter);
         }
 
         [HarmonyPatch(typeof(UIScriptMode), "Init"), HarmonyPostfix]
@@ -162,22 +164,13 @@ public class Plugin : BasePlugin
             if (dialogueAspectRatioFitter != null) return;
             dialogueAspectRatioFitter = __instance.gameObject.AddComponent<AspectRatioFitter>();
             Debug.Log("Adding Aspect Ratio Fitter to " + __instance.gameObject.name);
-            dialogueAspectRatioFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            dialogueAspectRatioFitter.enabled = true;
-            // Check if the display aspect ratio is less than 16:9, and if so, disable the AspectRatioFitter and use the old transforms.
-            if (Screen.currentResolution.m_Width / Screen.currentResolution.m_Height >= 1920.0f / 1080.0f)
-            {
-                dialogueAspectRatioFitter.aspectRatio = 1920.0f / 1080.0f;
-            }
-            else
-            {
-                dialogueAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
-            }
-            
+            AdjustAspectRatioFitter(dialogueAspectRatioFitter);
+
             // Fix the Vignette effect with ultrawide resolutions.
             var topVignette = __instance.transform.Find("BlackEdge/EdgeUp");
             var bottomVignette = __instance.transform.Find("BlackEdge/EdgeBottom");
             var fadeOut = __instance.transform.Find("BlackScreen");
+
             // A quick function of sorts to calculate the correct horizontal offset for fullscreen UI elements.
             float horizontalARDifference()
             {
@@ -186,11 +179,12 @@ public class Plugin : BasePlugin
                 if (currentAR < originalAR) return 1.0f;
                 return currentAR / originalAR;
             }
+
             // Create a cached variable of sorts, so we don't have to run the same function twice.
             var offset = horizontalARDifference();
-            topVignette.transform.localScale    = new Vector3(offset, 1.0f, 1.0f);
+            topVignette.transform.localScale = new Vector3(offset, 1.0f, 1.0f);
             bottomVignette.transform.localScale = new Vector3(offset, 1.0f, 1.0f);
-            fadeOut.transform.localScale        = new Vector3(offset, 1.0f, 1.0f);
+            fadeOut.transform.localScale = new Vector3(offset, 1.0f, 1.0f);
         }
 
         [HarmonyPatch(typeof(StaffManager), nameof(StaffManager.PlayVideo)), HarmonyPostfix]
@@ -218,18 +212,7 @@ public class Plugin : BasePlugin
             if (vignetteAspectRatioFitter != null) return;
             vignetteAspectRatioFitter = __instance.gameObject.AddComponent<AspectRatioFitter>();
             Debug.Log("Adding Aspect Ratio Fitter to " + __instance.gameObject.name);
-            vignetteAspectRatioFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            vignetteAspectRatioFitter.enabled = true;
-
-            // Check if the display aspect ratio is less than 16:9, and if so, disable the AspectRatioFitter and use the old transforms.
-            if (Screen.currentResolution.m_Width / Screen.currentResolution.m_Height >= 1920.0f / 1080.0f)
-            {
-                vignetteAspectRatioFitter.aspectRatio = 1920.0f / 1080.0f;
-            }
-            else
-            {
-                vignetteAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
-            }
+            AdjustAspectRatioFitter(vignetteAspectRatioFitter);
         }
     }
 }
