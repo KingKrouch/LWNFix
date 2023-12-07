@@ -1,5 +1,6 @@
 ﻿using System;
 using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
@@ -18,11 +19,24 @@ public class Plugin : BasePlugin
 {
     private static ManualLogSource? LogSource { get; set; }
 
+    public static ConfigEntry<int>  _iHorizontalResolution;
+    public static ConfigEntry<int>  _iVerticalResolution;
+    public static ConfigEntry<bool> _bCenteredCamera;
+
+    private void InitConfig()
+    {
+        _iHorizontalResolution = Config.Bind("Resolution", "Horizontal Resolution", Screen.currentResolution.m_Width);
+        _iVerticalResolution = Config.Bind("Resolution", "Vertical Resolution", Screen.currentResolution.height);
+        _bCenteredCamera = Config.Bind("Camera", "Centered Camera", false);
+    }
+
     public override void Load()
     {
         LogSource = Log;
         
         Log.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+
+        InitConfig();
         
         Harmony.CreateAndPatchAll(typeof(ResolutionPatches));
         Harmony.CreateAndPatchAll(typeof(UIPatches));
@@ -48,7 +62,7 @@ public class Plugin : BasePlugin
         public static bool ForceCustomResolution()
         {
             Debug.Log("Resolution Value Changed");
-            Screen.SetResolution(3440, 1440, FullScreenMode.FullScreenWindow);
+            Screen.SetResolution(_iHorizontalResolution.Value, _iVerticalResolution.Value, FullScreenMode.FullScreenWindow);
             return false;
         }
     }
@@ -96,11 +110,14 @@ public class Plugin : BasePlugin
         [HarmonyPatch(typeof(PlayerCamera), nameof(PlayerCamera.Init), new Type[] { typeof(WizardGirlManage) }), HarmonyPostfix]
         public static void PlayerCameraTweaks(PlayerCamera __instance)
         {
-            // Find the GameObject named "LookHereRotation"
-            var lookHereRot = GameObject.Find("LookHereRotation");
-            //var lookHereRot = __instance.g_PlayerLookHereRot.Find("LookHereRotation");
-            if (lookHereRot != null) {
-                lookHereRot.gameObject.transform.localPosition = new Vector3(-0.5f, 0.5f, 0.0f);
+            // Checks if the centered camera option is enabled before running anything else.
+            if (_bCenteredCamera.Value) {
+                // Find the GameObject named "LookHereRotation"
+                var lookHereRot = GameObject.Find("LookHereRotation");
+                //var lookHereRot = __instance.g_PlayerLookHereRot.Find("LookHereRotation");
+                if (lookHereRot != null) {
+                    lookHereRot.gameObject.transform.localPosition = new Vector3(-0.5f, 0.5f, 0.0f);
+                }
             }
             
             // Use Overscan FOV scaling. First we need to get the camera FOV before making adjustments.
@@ -119,7 +136,7 @@ public class Plugin : BasePlugin
         [HarmonyPatch(typeof(UIMagicBar), nameof(UIMagicBar.Init)), HarmonyPostfix]
         public static void AddAspectRatioFitterToMagicBar(UIMagicBar __instance)
         {
-            // We need to explicitly check if it exists first, as for some reason, the component can be added twice and cause slow movement.
+            // We need to explicitly check if it exists first, as for some reason, the component can be added twice.
             var magicBarAspectRatioFitter = __instance.gameObject.GetComponent<AspectRatioFitter>();
             if (magicBarAspectRatioFitter != null) return;
             magicBarAspectRatioFitter = __instance.gameObject.AddComponent<AspectRatioFitter>();
@@ -135,6 +152,26 @@ public class Plugin : BasePlugin
             else
             {
                 magicBarAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
+            }
+        }
+
+        [HarmonyPatch(typeof(UIScriptMode), "Init"), HarmonyPostfix]
+        public static void AddAspectRatioFitterToTrialTowerDialogue(UIScriptMode __instance)
+        {
+            var dialogueAspectRatioFitter = __instance.gameObject.GetComponent<AspectRatioFitter>();
+            if (dialogueAspectRatioFitter != null) return;
+            dialogueAspectRatioFitter = __instance.gameObject.AddComponent<AspectRatioFitter>();
+            Debug.Log("Adding Aspect Ratio Fitter to " + __instance.gameObject.name);
+            dialogueAspectRatioFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            dialogueAspectRatioFitter.enabled = true;
+            // Check if the display aspect ratio is less than 16:9, and if so, disable the AspectRatioFitter and use the old transforms.
+            if (Screen.currentResolution.m_Width / Screen.currentResolution.m_Height >= 1920.0f / 1080.0f)
+            {
+                dialogueAspectRatioFitter.aspectRatio = 1920.0f / 1080.0f;
+            }
+            else
+            {
+                dialogueAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
             }
         }
 
