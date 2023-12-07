@@ -13,3 +13,5 @@ The scale of LBack02 and RBack02 need the local position shifted about 20 pixels
 In hindsight, porting my letterbox/pillarbox GameObject from SvSFix would probably work better in the long-run.
 
 TitleSceneManager might have what we need for a camera? Need to look further into it.
+
+ScriptMode > BlackEdge > EdgeUp / EdgeBottom, adjust X scale.

@@ -173,6 +173,24 @@ public class Plugin : BasePlugin
             {
                 dialogueAspectRatioFitter.aspectRatio = Screen.currentResolution.m_Width / (float)Screen.currentResolution.m_Height;
             }
+            
+            // Fix the Vignette effect with ultrawide resolutions.
+            var topVignette = __instance.transform.Find("BlackEdge/EdgeUp");
+            var bottomVignette = __instance.transform.Find("BlackEdge/EdgeBottom");
+            var fadeOut = __instance.transform.Find("BlackScreen");
+            // A quick function of sorts to calculate the correct horizontal offset for fullscreen UI elements.
+            float horizontalARDifference()
+            {
+                var currentAR = (float)Screen.currentResolution.m_Width / Screen.currentResolution.m_Height;
+                var originalAR = 1920.0f / 1080.0f;
+                if (currentAR < originalAR) return 1.0f;
+                return currentAR / originalAR;
+            }
+            // Create a cached variable of sorts, so we don't have to run the same function twice.
+            var offset = horizontalARDifference();
+            topVignette.transform.localScale    = new Vector3(offset, 1.0f, 1.0f);
+            bottomVignette.transform.localScale = new Vector3(offset, 1.0f, 1.0f);
+            fadeOut.transform.localScale        = new Vector3(offset, 1.0f, 1.0f);
         }
 
         [HarmonyPatch(typeof(StaffManager), nameof(StaffManager.PlayVideo)), HarmonyPostfix]
